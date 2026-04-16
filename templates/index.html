@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Anthropic Core Workflow RL</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel">
+        <h1>Anthropic Core Workflow RL</h1>
+        <p class="lede">Seeded queue, deterministic reset, and explicit task-state transitions.</p>
+        <div class="toolbar">
+          <button id="reset">Reset State</button>
+        </div>
+        <div class="layout">
+          <aside>
+            <h2>Queue</h2>
+            <ul id="task-list"></ul>
+          </aside>
+          <section class="detail">
+            <h2>Task</h2>
+            <div id="task-detail">Select a task.</div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script>
+      let selectedId = null;
+
+      async function loadTasks() {
+        const res = await fetch('/api/tasks');
+        const tasks = await res.json();
+        const list = document.getElementById('task-list');
+        list.innerHTML = '';
+        tasks.forEach((task) => {
+          const item = document.createElement('li');
+          const button = document.createElement('button');
+          button.textContent = `${task.title} [${task.status}]`;
+          button.onclick = () => {
+            selectedId = task.id;
+            loadTask(task.id);
+          };
+          item.appendChild(button);
+          list.appendChild(item);
+        });
+      }
+
+      async function loadTask(taskId) {
+        const res = await fetch(`/api/tasks/${taskId}`);
+        const task = await res.json();
+        const root = document.getElementById('task-detail');
+        root.innerHTML = `
+          <h3>${task.title}</h3>
+          <p><strong>Priority:</strong> ${task.priority}</p>
+          <p><strong>User message:</strong> ${task.user_message}</p>
+          <p><strong>Context:</strong> ${task.context.join(' ')}</p>
+          <textarea id="draft" rows="8" placeholder="Write draft here">${task.draft || ''}</textarea>
+          <div class="actions">
+            <button id="save-draft">Save Draft</button>
+            <button id="submit-task">Submit</button>
+          </div>
+          <pre>${JSON.stringify(task.history, null, 2)}</pre>
+        `;
+        document.getElementById('save-draft').onclick = saveDraft;
+        document.getElementById('submit-task').onclick = submitTask;
+      }
+
+      async function saveDraft() {
+        const draft = document.getElementById('draft').value;
+        await fetch(`/api/tasks/${selectedId}/draft`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draft })
+        });
+        await loadTasks();
+        await loadTask(selectedId);
+      }
+
+      async function submitTask() {
+        await fetch(`/api/tasks/${selectedId}/submit`, { method: 'POST' });
+        await loadTasks();
+        await loadTask(selectedId);
+      }
+
+      document.getElementById('reset').onclick = async () => {
+        await fetch('/api/reset', { method: 'POST' });
+        selectedId = null;
+        document.getElementById('task-detail').textContent = 'Select a task.';
+        await loadTasks();
+      };
+
+      loadTasks();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "environment": {
+    "targetWorkflow": "Anthropic core workflow",
+    "persona": "Operations agent managing a queue of environment delivery tasks",
+    "objective": "Move seeded work items to completion with accurate state transitions and reset support"
+  },
+  "tasks": [
+    {
+      "id": "task-101",
+      "title": "Review PRD draft for workflow fidelity",
+      "status": "queued",
+      "priority": "high",
+      "assignee": "Alex",
+      "notes": [
+        "Confirm reward-shaping assumptions",
+        "Verify reset semantics for partial completions"
+      ]
+    },
+    {
+      "id": "task-102",
+      "title": "Implement task transition endpoint",
+      "status": "in_progress",
+      "priority": "critical",
+      "assignee": "Jordan",
+      "notes": [
+        "Keep transition log for replay",
+        "Return updated state after mutation"
+      ]
+    },
+    {
+      "id": "task-103",
+      "title": "Prepare QA validation checklist",
+      "status": "blocked",
+      "priority": "medium",
+      "assignee": "Sam",
+      "notes": [
+        "Need deployed URL",
+        "Need recording artifact path"
+      ]
+    }
+  ],
+  "transitionLog": []
+}

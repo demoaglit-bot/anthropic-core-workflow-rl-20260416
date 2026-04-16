@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Anthropic Core Workflow RL Environment</title>
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --panel: #fffaf2;
+        --ink: #1e1d1a;
+        --accent: #bc5f2c;
+        --accent-dark: #7b3d1d;
+        --line: #d9c9b3;
+        --muted: #6c6258;
+        --success: #2f7d4a;
+        --warn: #a04f20;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        background:
+          radial-gradient(circle at top left, rgba(188,95,44,0.15), transparent 35%),
+          linear-gradient(180deg, #f8f2e8 0%, var(--bg) 100%);
+        color: var(--ink);
+      }
+      header {
+        padding: 28px 32px 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 38px;
+        line-height: 1;
+      }
+      .subtitle {
+        margin-top: 10px;
+        max-width: 760px;
+        color: var(--muted);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 20px;
+        padding: 0 24px 24px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 10px 30px rgba(61, 41, 18, 0.08);
+      }
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      button, select, input {
+        font: inherit;
+      }
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 14px;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #efe2d0;
+        color: var(--accent-dark);
+      }
+      .task-list {
+        display: grid;
+        gap: 12px;
+      }
+      .task-card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        background: white;
+        cursor: pointer;
+      }
+      .task-card.active {
+        outline: 2px solid var(--accent);
+      }
+      .meta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .pill {
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: #f5eadc;
+        color: var(--accent-dark);
+        font-size: 13px;
+      }
+      .detail-grid {
+        display: grid;
+        gap: 12px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 96px;
+        font: inherit;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: white;
+      }
+      .log {
+        max-height: 200px;
+        overflow: auto;
+        border-top: 1px solid var(--line);
+        margin-top: 16px;
+        padding-top: 12px;
+        color: var(--muted);
+      }
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Anthropic Core Workflow RL Environment</h1>
+      <div class="subtitle">
+        Resettable seeded environment for task triage, detail review, status transitions, assignment updates, and note capture.
+      </div>
+    </header>
+    <main class="layout">
+      <section class="panel">
+        <div class="toolbar">
+          <button id="resetButton">Reset Environment</button>
+          <label>
+            Status Filter
+            <select id="statusFilter">
+              <option value="all">all</option>
+              <option value="queued">queued</option>
+              <option value="in_progress">in_progress</option>
+              <option value="blocked">blocked</option>
+              <option value="completed">completed</option>
+            </select>
+          </label>
+        </div>
+        <div id="taskList" class="task-list"></div>
+      </section>
+      <section class="panel">
+        <div id="detailRoot">Select a task to inspect and mutate state.</div>
+      </section>
+    </main>
+    <script>
+      let state = null;
+      let selectedTaskId = null;
+
+      async function fetchState() {
+        const response = await fetch("/api/state");
+        state = await response.json();
+        if (!selectedTaskId && state.tasks.length) {
+          selectedTaskId = state.tasks[0].id;
+        }
+        render();
+      }
+
+      function getVisibleTasks() {
+        const filter = document.getElementById("statusFilter").value;
+        if (filter === "all") return state.tasks;
+        return state.tasks.filter((task) => task.status === filter);
+      }
+
+      function render() {
+        const taskList = document.getElementById("taskList");
+        const detailRoot = document.getElementById("detailRoot");
+        const visibleTasks = getVisibleTasks();
+        taskList.innerHTML = "";
+
+        visibleTasks.forEach((task) => {
+          const card = document.createElement("button");
+          card.className = "task-card" + (task.id === selectedTaskId ? " active" : "");
+          card.onclick = () => {
+            selectedTaskId = task.id;
+            render();
+          };
+          card.innerHTML = `
+            <strong>${task.title}</strong>
+            <div class="meta">
+              <span class="pill">${task.status}</span>
+              <span class="pill">priority: ${task.priority}</span>
+              <span class="pill">assignee: ${task.assignee}</span>
+            </div>
+          `;
+          taskList.appendChild(card);
+        });
+
+        const task = state.tasks.find((entry) => entry.id === selectedTaskId);
+        if (!task) {
+          detailRoot.textContent = "No task available for the current filter.";
+          return;
+        }
+
+        detailRoot.innerHTML = `
+          <div class="detail-grid">
+            <h2>${task.title}</h2>
+            <label>
+              Status
+              <select id="statusInput">
+                ${["queued", "in_progress", "blocked", "completed"].map((value) =>
+                  `<option value="${value}" ${task.status === value ? "selected" : ""}>${value}</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              Assignee
+              <input id="assigneeInput" value="${task.assignee}">
+            </label>
+            <label>
+              Note
+              <textarea id="noteInput" placeholder="Add an audit note"></textarea>
+            </label>
+            <button id="saveButton">Apply Transition</button>
+            <div>
+              <strong>Current notes</strong>
+              <ul>${task.notes.map((note) => `<li>${note}</li>`).join("")}</ul>
+            </div>
+            <div class="log">
+              <strong>Transition log</strong>
+              <ul>${state.transitionLog.map((entry) =>
+                `<li>${entry.timestamp}: ${entry.taskId} -> ${entry.status} (${entry.assignee})</li>`).join("")}</ul>
+            </div>
+          </div>
+        `;
+
+        document.getElementById("saveButton").onclick = applyTransition;
+      }
+
+      async function applyTransition() {
+        const status = document.getElementById("statusInput").value;
+        const assignee = document.getElementById("assigneeInput").value;
+        const note = document.getElementById("noteInput").value;
+        await fetch(`/api/tasks/${selectedTaskId}/transition`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, assignee, note })
+        });
+        await fetchState();
+      }
+
+      document.getElementById("statusFilter").onchange = render;
+      document.getElementById("resetButton").onclick = async () => {
+        await fetch("/api/reset", { method: "POST" });
+        await fetchState();
+      };
+
+      fetchState();
+    </script>
+  </body>
+</html>
