@@ -1,0 +1,77 @@
+openapi: 3.1.0
+info:
+  title: Anthropic Core Workflow RL Environment API
+  version: 0.1.0
+  description: |
+    API surface for a resettable RL environment modeling a compact Anthropic task workflow.
+servers:
+  - url: http://127.0.0.1:8016
+paths:
+  /api/state:
+    get:
+      summary: Get the current environment state
+      operationId: getState
+      responses:
+        "200":
+          description: Current environment snapshot
+  /api/reset:
+    post:
+      summary: Reset the environment to the seeded baseline
+      operationId: resetEnvironment
+      responses:
+        "200":
+          description: Environment reset result
+  /api/tasks/{taskId}/transition:
+    post:
+      summary: Apply a state transition to a task
+      operationId: transitionTask
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                assignee:
+                  type: string
+                note:
+                  type: string
+      responses:
+        "200":
+          description: Updated task state
+        "404":
+          description: Task not found
+components:
+  schemas:
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - priority
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        assignee:
+          type: string
+        notes:
+          type: array
+          items:
+            type: string
